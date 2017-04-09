@@ -4,7 +4,7 @@
 
 class Node(object):
 
-	def __init__(self, index, type, x, y, z, radius, pid): #x、y、z：为了读入的数据能直接导入
+	def __init__(self, index, type, x, y, z, radius, pid): 
 		self.index = index
 		self.type = type
 		self.x = x
@@ -13,23 +13,23 @@ class Node(object):
 		self.radius = radius
 		self.pid = pid
 
-		self.parent = None # parent NODE
+		self.parent = None 
 		self.depth = 0
 		self.branch_node_num = 0
 		self.path_to_ending = 0 
-		self.children = [] # ************
+		self.children = [] 
 
-def readSWCFile(filename): # file => data tuple
+def readSWCFile(filename): 
 	with open(filename, 'r') as f:
-		return (line for line in f.readlines() if not line.startswith('#')) # return a tuple not a list
+		return (line for line in f.readlines() if not line.startswith('#'))
 
-def parseLine(line): # line => node (as str type)
-	return Node(*line.split()) # !!!!!
+def parseLine(line): 
+	return Node(*line.split()) 
 
-def process(tree): # to caldulate "branch_node_num" & "path_to_ending" for each node.
-	if not tree.parent: # has no parent i.e. the root
+def process(tree): 
+	if not tree.parent: 
 		tree.branch_node_num = 0
-	elif tree.parent.pid != '-1' and len(tree.parent.children) > 1: # parent is a branch point and not the root
+	elif tree.parent.pid != '-1' and len(tree.parent.children) > 1: 
 		tree.branch_node_num = tree.parent.branch_node_num + 1
 	else:
 		tree.branch_node_num = tree.parent.branch_node_num
@@ -37,31 +37,27 @@ def process(tree): # to caldulate "branch_node_num" & "path_to_ending" for each 
 	for child in tree.children:
 		process(child)
 
-		##### By now, #{branch points} of all node has been calculated.
-		##### The following part is to calculate the distance 
-		##### from each node to its corresponding ending point.
-
 	else:
-		if not tree.children: # has no child i.e. the ending node
+		if not tree.children: 
 			tree.path_to_ending = 0
 		else:
 			tree.path_to_ending = 1 + min(c.path_to_ending for c in tree.children)
 
 def createForest(swc): 
-	all_node = {}  # ******************* TO FIND EACH NODE IN ORDER TO CONSTRUCT STRCTURE
+	all_node = {}  
 	forest = []
-	for line in swc: # construct the structure of trees
+	for line in swc: 
 		node = parseLine(line)
-		if node.pid == '-1': # if the root, put into forest
+		if node.pid == '-1': 
 			forest.append(node)
-		else: # self.parent, self.depth, self.children
+		else: 
 			parent_node = all_node[node.pid]
 			node.parent = parent_node
 			node.depth = node.parent.depth + 1
 			node.parent.children.append(node)
 		all_node[node.index] = node
 
-	for tree in forest: # complete all indirect information of each node
+	for tree in forest: 
 		process(tree)
 	return forest
 
