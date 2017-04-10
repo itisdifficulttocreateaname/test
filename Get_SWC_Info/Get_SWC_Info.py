@@ -1,78 +1,93 @@
-#!/usr/bin/python
-#-*-coding=utf-8-*-
- 
+import math
+from anytree import Node, RenderTree, AsciiStyle
+from anytree.dotexport import RenderTreeGraph
 
-class Node(object):
-
-	def __init__(self, index, type, x, y, z, radius, pid): 
-		self.index = index
+class NeuronNode(Node):
+	def __init__(self, id, type, x, y, z, r, pid):
+		super(Node, self).__init__()
+		self.name = id
+		self.id = id
 		self.type = type
-		self.x = x
-		self.y = y
-		self.z = z
-		self.radius = radius
+		self.x = float(x)
+		self.y = float(y)
+		self.z = float(z)
+		self.r = r
 		self.pid = pid
 
-		self.parent = None 
-		self.depth = 0
+		self.parent = None
 		self.branch_node_num = 0
-		self.path_to_ending = 0 
-		self.children = [] 
+		self.dist_to_root = 0
+		self.dist_to_leaf = 0
 
-def readSWCFile(filename): 
+def readSWCFile(filename):
 	with open(filename, 'r') as f:
 		return (line for line in f.readlines() if not line.startswith('#'))
 
-def parseLine(line): 
-	return Node(*line.split()) 
+def d(n1, n2):
+	return math.sqrt((n1.x - n2.x)**2 + (n1.y - n2.y)**2 + (n1.z - n2.z)**2)
 
-def process(tree): 
-	if not tree.parent: 
+def parseLine(line):
+	return NeuronNode(*line.split())
+
+def process(tree):
+	if tree.is_root:
 		tree.branch_node_num = 0
-	elif tree.parent.pid != '-1' and len(tree.parent.children) > 1: 
-		tree.branch_node_num = tree.parent.branch_node_num + 1
+		tree.dist_to_root = 0
 	else:
-		tree.branch_node_num = tree.parent.branch_node_num
-
+		tree.dist_to_root = tree.parent.dist_to_root + d(tree, tree.parent)
+		if not tree.parent.is_root and len(tree.siblings) > 0:
+			tree.branch_node_num = tree.parent.branch_node_num + 1
+		else:
+			tree.branch_node_num = tree.parent.branch_node_num
+	
 	for child in tree.children:
 		process(child)
-
 	else:
-		if not tree.children: 
-			tree.path_to_ending = 0
+		if tree.is_leaf:
+			tree.dist_to_leaf = 0
 		else:
-			tree.path_to_ending = 1 + min(c.path_to_ending for c in tree.children)
+			dists = ((d(tree, child) + child.dist_to_leaf) for child in tree.children)
+			tree.dist_to_leaf = min(dists)
 
-def createForest(swc): 
-	all_node = {}  
+def createForest(swc):
+	all_node = {}
 	forest = []
-	for line in swc: 
-		node = parseLine(line)
-		if node.pid == '-1': 
+	for line in swc:
+		node = parseLine(line) 
+		all_node[node.name] = node
+		if node.pid == '-1':
 			forest.append(node)
-		else: 
-			parent_node = all_node[node.pid]
-			node.parent = parent_node
-			node.depth = node.parent.depth + 1
-			node.parent.children.append(node)
-		all_node[node.index] = node
+		else:
+			node.parent = all_node[node.pid]
 
-	for tree in forest: 
+	for tree in forest:
 		process(tree)
+
 	return forest
 
-def print_tree(tree):
-	f.writelines(str(tree.index) + '    ' + str(tree.radius) + '    ' + str(tree.depth) + '    ' + str(tree.branch_node_num) + '    ' + str(tree.path_to_ending) + '\n')
-	for c in tree.children:
-		print_tree(c)
+def print_tree_to_graph(forest):
+	i = 1
+	for tree in forest:
+		RenderTreeGraph(tree).to_picture("tree%s.png" %i)
+		i = i + 1
+
+def print_detail(f, tree):
+	f.writelines('{0},    {1},    {2},    {3},    {4}\n'.format(tree.id, tree.r, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf))
+	for child in tree.children:
+		print_detail(f, child)
+
+def print_detail_to_file(forest, filename):
+	with open (filename, 'w') as f:
+		f.writelines("Id  Radius  #branch_points  Dist_to_root  Dist_to_leaf\n")
+		i = 1
+		for tree in forest:
+			f.writelines("\nTree%d\n" %i)
+			print_detail(f, tree)
+			i = i + 1
 
 if __name__ == '__main__':
 	swc = readSWCFile('test.swc')
 	forest = createForest(swc)
-	with open('Neuron_Info.txt', 'w') as f:
-		f.writelines('id  radius  depth  num_of_branch_points  distance_to_end_point\n')
-		for tree in forest:
-			print_tree(tree)
-	
-
+	print_tree_to_graph(forest)
+	print_detail_to_file(forest, "Node_Info.txt")
 
