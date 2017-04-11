@@ -1,4 +1,8 @@
+#!/usr/bin/python
+#coding = utf-8
+
 import math
+import csv
 from anytree import Node, RenderTree, AsciiStyle
 from anytree.dotexport import RenderTreeGraph
 
@@ -65,29 +69,23 @@ def createForest(swc):
 
 	return forest
 
-def print_tree_to_graph(forest):
-	i = 1
-	for tree in forest:
-		RenderTreeGraph(tree).to_picture("tree%s.png" %i)
-		i = i + 1
-
-def print_detail(f, tree):
-	f.writelines('{0},    {1},    {2},    {3},    {4}\n'.format(tree.id, tree.r, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf))
+def print_tree_to_CSVFile(tree, spamwriter):
+	spamwriter.writerow([tree.id, tree.r, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
 	for child in tree.children:
-		print_detail(f, child)
+		print_tree_to_CSVFile(child, spamwriter)
 
-def print_detail_to_file(forest, filename):
-	with open (filename, 'w') as f:
-		f.writelines("Id  Radius  #branch_points  Dist_to_root  Dist_to_leaf\n")
+def print_forest_to_CSVFile(forest, filename):
+	with open(filename, 'wb') as csvfile:
+		spamwriter = csv.writer(csvfile, delimiter = ',', quotechar = '|', quoting = csv.QUOTE_MINIMAL)
+		spamwriter.writerow(['Id', 'Raius', '#branch_points', 'Dist_to_root', 'Dist_to_leaf'])
 		i = 1
 		for tree in forest:
-			f.writelines("\nTree%d\n" %i)
-			print_detail(f, tree)
+			spamwriter.writerow(['Tree%d'%i, ])
+			print_tree_to_CSVFile(tree, spamwriter)
 			i = i + 1
+
 
 if __name__ == '__main__':
 	swc = readSWCFile('test.swc')
 	forest = createForest(swc)
-	print_tree_to_graph(forest)
-	print_detail_to_file(forest, "Node_Info.txt")
-
+	print_forest_to_CSVFile(forest, 'Node_Info.csv')
