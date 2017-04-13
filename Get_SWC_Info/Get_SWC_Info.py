@@ -78,11 +78,8 @@ def print_forest_to_CSVFile(forest, filename):
 	with open(filename, 'wb') as csvfile:
 		spamwriter = csv.writer(csvfile, delimiter = ',', quotechar = '|', quoting = csv.QUOTE_MINIMAL)
 		spamwriter.writerow(['Id', 'Raius', '#branch_points', 'Dist_to_root', 'Dist_to_leaf'])
-		i = 1
 		for tree in forest:
-			spamwriter.writerow(['Tree%d'%i, ])
 			print_tree_to_CSVFile(tree, spamwriter)
-			i = i + 1
 
 
 if __name__ == '__main__':
