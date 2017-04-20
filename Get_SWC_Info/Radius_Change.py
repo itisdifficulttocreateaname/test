@@ -53,7 +53,8 @@ def Mark_Derivative(leaf):
         if node.diff is None:
             node.diff = diff
         else:
-            node.diff = min(node.diff, diff)
+            node.diff = filter(lambda x: abs(x) <= abs(diff), (node.diff, diff))[0]
+            
         
 
 
