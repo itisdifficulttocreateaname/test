@@ -5,7 +5,7 @@ import math
 import csv
 from anytree import Node, RenderTree, AsciiStyle
 from anytree.dotexport import RenderTreeGraph
-from Radius_Change import Mark_Derivative, DrawBranch
+from Radius_Change import Mark_Derivative
 
 
 class NeuronNode(Node):
@@ -14,17 +14,17 @@ class NeuronNode(Node):
 		self.name = id
 		self.id = id
 		self.type = type
-		self.x = float(x)
-		self.y = float(y)
-		self.z = float(z)
-		self.r = r
+		self.x = float(x) * 0.0884
+		self.y = float(y) * 0.0884
+		self.z = float(z) 
+		self.r = float(r) * 0.0884
 		self.pid = pid
 
 		self.parent = None
 		self.branch_node_num = 0
 		self.dist_to_root = 0
 		self.dist_to_leaf = 0
-		self.diff = None
+		self.der = None
 
 
 def readSWCFile(filename):
@@ -57,7 +57,6 @@ def process(tree):
 		if tree.is_leaf:
 			tree.dist_to_leaf = 0
 			Mark_Derivative(tree)
-			DrawBranch(tree)
 
 		else:
 			dists = ((d(tree, child) + child.dist_to_leaf) for child in tree.children)
@@ -82,7 +81,7 @@ def createForest(swc):
 
 
 def print_tree_to_CSVFile(tree, spamwriter):
-	spamwriter.writerow([tree.id, tree.r, tree.diff, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
+	spamwriter.writerow([tree.id, tree.r, tree.der, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
 	for child in tree.children:
 		print_tree_to_CSVFile(child, spamwriter)
 
@@ -90,7 +89,7 @@ def print_tree_to_CSVFile(tree, spamwriter):
 def print_forest_to_CSVFile(forest, filename):
 	with open(filename, 'wb') as csvfile:
 		spamwriter = csv.writer(csvfile, delimiter = ',', quotechar = '|', quoting = csv.QUOTE_MINIMAL)
-		spamwriter.writerow(['Id', 'Raius', 'Sec_order_diff', '#branch_points', 'Dist_to_root', 'Dist_to_leaf'])
+		spamwriter.writerow(['Id', 'Raius', 'Sec_order_der', '#branch_points', 'Dist_to_root', 'Dist_to_leaf'])
 		for tree in forest:
 			print_tree_to_CSVFile(tree, spamwriter)
 

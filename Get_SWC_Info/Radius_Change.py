@@ -5,10 +5,12 @@ import math
 import matplotlib.pyplot as plt 
 from scipy import interpolate
 import numpy as np
+from copy import deepcopy
 
 global delta
 
 def Get_XY(leaf, X, Y):
+
     node = leaf 
     while True:
         X.insert(0, node.dist_to_root)
@@ -19,43 +21,74 @@ def Get_XY(leaf, X, Y):
 
 
 def Cal_Derivative(f):
+
     def Df(x):
         global delta
         return (f(x+delta)-f(x-delta))/(2*delta)
     return Df 
 
 
-def DrawBranch(leaf):
-    x, y = [], []
-    Get_XY(leaf, x, y)
-    f = interpolate.UnivariateSpline(x, y)
+def Draw(f, x, y):
+
     xnew = np.arange(min(x), max(x), (max(x)-min(x))/(len(x)*50))
     ynew = map(f, xnew)
-    plt.plot(x, y, 'o', xnew, ynew, '-')
-    plt.savefig('Figs/leaf%s.jpg'%leaf.id)
-    plt.clf()
+    
+    der = map(Cal_Derivative(Cal_Derivative(f)), x)
+    dernew = map(Cal_Derivative(Cal_Derivative(f)), xnew) 
+    
+    fig, left_axis = plt.subplots()
+    right_axis = left_axis.twinx()
+
+    p1, = left_axis.plot(xnew, ynew, 'b-')
+    p1, = left_axis.plot(x, y, 'bo')  
+    p2, = right_axis.plot(xnew, dernew, 'r:')
+    p2, = right_axis.plot(x, der, 'r.')
+
+    left_axis.set_xlabel('Distance to root')
+    left_axis.set_ylabel('Radius')
+    right_axis.set_ylabel('Second-order derivative')
+
+
+def LinearInterpolation(x, y):
+
+    f = interpolate.interp1d(x, y, kind = 'slinear')
+    i = len(x)-2
+    xnew = deepcopy(x)
+
+    while i >= 0:
+        if(x[i+1]-x[i] > (max(x)-min(x))/(len(x)-1)):
+            n = int((x[i+1]-x[i])/(max(x)-min(x))*len(x))
+            for j in range(n, 0, -1):
+                xnew.insert(i+1, x[i] + (x[i+1]-x[i])*j/(n+1))
+        i -= 1
+
+    ynew = [f(x) for x in xnew]
+    return xnew, ynew
 
 
 def Mark_Derivative(leaf):
-    # X：从root到leaf的路径上所有点到root的’折线和‘距离
-    # Y：从root到leaf的路径上所有点的半径
+
+    # X:'dist_to_root' of each node.
+    # Y: radius 
     X, Y = [], [] 
     Get_XY(leaf, X, Y)
+    Xnew, Ynew = LinearInterpolation(X, Y)
 
     global delta
     delta = X[1]/10000.
 
-    f = interpolate.UnivariateSpline(X, Y) #用三次样条插值模拟出f   
-    Sec_diff = map(Cal_Derivative(Cal_Derivative(f)), X)
+    f = interpolate.InterpolatedUnivariateSpline(Xnew, Ynew, k = 4)    
+    Sec_der = map(Cal_Derivative(Cal_Derivative(f)), X)
     
     for node in leaf.path:
-        diff = Sec_diff.pop()
-        if node.diff is None:
-            node.diff = diff
+        der = Sec_der.pop()
+        if node.der is None:
+            node.der = der
         else:
-            node.diff = filter(lambda x: abs(x) <= abs(diff), (node.diff, diff))[0]
-            
-        
-
-
-
+            node.der = filter(lambda x: abs(x)<=abs(der), (node.der, der))[0]
+    
+    Draw(f, X, Y) 
+    plt.savefig('Figs(k=4&add points)/leaf%s.jpg'%leaf.id)
+    plt.clf()
+    plt.close('all')
+    
