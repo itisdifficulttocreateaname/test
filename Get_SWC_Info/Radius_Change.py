@@ -24,7 +24,7 @@ def Cal_Derivative(f):
 
     def Df(x):
         global delta
-        return (f(x+delta)-f(x-delta))/(2*delta)
+        return (f(x+delta)-f(x))/delta
     return Df 
 
 
@@ -52,15 +52,20 @@ def Draw(f, x, y):
 def LinearInterpolation(x, y):
 
     f = interpolate.interp1d(x, y, kind = 'slinear')
-    i = len(x)-2
+    delta_y = np.median(tuple(abs(y[i]-y[i-1]) for i in range(1, len(x))))
     xnew = deepcopy(x)
 
-    while i >= 0:
-        if(x[i+1]-x[i] > (max(x)-min(x))/(len(x)-1)):
+    for i in range(len(x)-2, -1, -1):
+        
+        if abs(y[i+1]-y[i]) > delta_y:
+            n = int(abs(y[i+1]-y[i]) / delta_y)
+            for j in range(n, 0, -1):
+                xnew.insert(i+1, x[i] + (x[i+1]-x[i])*j/(n+1))
+        
+        elif x[i+1]-x[i] > (max(x)-min(x))/(len(x)-1):
             n = int((x[i+1]-x[i])/(max(x)-min(x))*len(x))
             for j in range(n, 0, -1):
                 xnew.insert(i+1, x[i] + (x[i+1]-x[i])*j/(n+1))
-        i -= 1
 
     ynew = [f(x) for x in xnew]
     return xnew, ynew
@@ -74,21 +79,29 @@ def Mark_Derivative(leaf):
     Get_XY(leaf, X, Y)
     Xnew, Ynew = LinearInterpolation(X, Y)
 
-    global delta
-    delta = X[1]/10000.
+    Xnew, Ynew = LinearInterpolation(Xnew, Ynew)
 
-    f = interpolate.InterpolatedUnivariateSpline(Xnew, Ynew, k = 4)    
+    global delta
+    delta = X[1]/1000000.
+
+    f = interpolate.UnivariateSpline(Xnew, Ynew, k = 4)
+    #f = interpolate.InterpolatedUnivariateSpline(Xnew, Ynew, k = 4)    
     Sec_der = map(Cal_Derivative(Cal_Derivative(f)), X)
     
     for node in leaf.path:
-        der = Sec_der.pop()
-        if node.der is None:
+        der = Sec_der.pop(0)
+
+        if node.is_leaf:
+            node.der = 0
+            node.parent.der = 0
+
+        elif node.der is None:
             node.der = der
         else:
             node.der = filter(lambda x: abs(x)<=abs(der), (node.der, der))[0]
     
     Draw(f, X, Y) 
-    plt.savefig('Figs(k=4&add points)/leaf%s.jpg'%leaf.id)
+    plt.savefig('Figs(UniSpl)/leaf%s.jpg'%leaf.id)
     plt.clf()
     plt.close('all')
     

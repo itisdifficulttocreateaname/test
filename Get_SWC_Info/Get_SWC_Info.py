@@ -13,11 +13,11 @@ class NeuronNode(Node):
 		super(Node, self).__init__()
 		self.name = id
 		self.id = id
-		self.type = type
+		self.type = int(type)
 		self.x = float(x) * 0.0884
 		self.y = float(y) * 0.0884
 		self.z = float(z) 
-		self.r = float(r) * 0.0884
+		self.r = float(r) * 2 #* 0.0884
 		self.pid = pid
 
 		self.parent = None
@@ -25,6 +25,13 @@ class NeuronNode(Node):
 		self.dist_to_root = 0
 		self.dist_to_leaf = 0
 		self.der = None
+
+
+def stretch_type(list):
+	m, M = min(list), max(list)
+	def f(x):
+		return int((x-m)/(M-m)*255)
+	return f
 
 
 def readSWCFile(filename):
@@ -76,12 +83,17 @@ def createForest(swc):
 
 	for tree in forest:
 		process(tree)
-
+		nodes = (tree, )+tree.descendants
+		
+		f = stretch_type([node.der for node in nodes])
+		for node in nodes:
+			node.type = f(node.der)
+		
 	return forest
 
 
 def print_tree_to_CSVFile(tree, spamwriter):
-	spamwriter.writerow([tree.id, tree.r, tree.der, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
+	spamwriter.writerow([tree.id, tree.type, tree.r/2*0.0884, tree.der, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
 	for child in tree.children:
 		print_tree_to_CSVFile(child, spamwriter)
 
@@ -89,12 +101,23 @@ def print_tree_to_CSVFile(tree, spamwriter):
 def print_forest_to_CSVFile(forest, filename):
 	with open(filename, 'wb') as csvfile:
 		spamwriter = csv.writer(csvfile, delimiter = ',', quotechar = '|', quoting = csv.QUOTE_MINIMAL)
-		spamwriter.writerow(['Id', 'Raius', 'Sec_order_der', '#branch_points', 'Dist_to_root', 'Dist_to_leaf'])
+		spamwriter.writerow(['Id', 'Type', 'Raius', 'Sec-order Der',  '#branch_points', 'Dist_to_root', 'Dist_to_leaf'])
 		for tree in forest:
 			print_tree_to_CSVFile(tree, spamwriter)
+
+
+def print_forest_to_SWCFile(forest, filename):
+	with open(filename, 'wb') as swcfile:
+		swcfile.write('# Id, Type, x, y, z, Radius, Parent\n')
+		for tree in forest:
+			nodes = (tree, ) + tree.descendants
+			for node in nodes:
+				swcfile.write('{0}, {1}, {2}, {3}, {4}, {5}, {6}\n'.format(node.id, node.type, node.x, node.y, node.z, node.r/2*0.0884, node.pid))
+		swcfile.flush()
 
 
 if __name__ == '__main__':
 	swc = readSWCFile('test.swc')
 	forest = createForest(swc)
 	print_forest_to_CSVFile(forest, 'Node_Info.csv')
+	print_forest_to_SWCFile(forest, 'After_stretch.swc')
