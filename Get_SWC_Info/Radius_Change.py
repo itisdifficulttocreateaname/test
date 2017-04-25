@@ -7,7 +7,6 @@ from scipy import interpolate
 import numpy as np
 from copy import deepcopy
 
-global delta
 
 def Get_XY(leaf, X, Y):
 
@@ -20,21 +19,13 @@ def Get_XY(leaf, X, Y):
         node = node.parent
 
 
-def Cal_Derivative(f):
-
-    def Df(x):
-        global delta
-        return (f(x+delta)-f(x))/delta
-    return Df 
-
-
 def Draw(f, x, y):
 
     xnew = np.arange(min(x), max(x), (max(x)-min(x))/(len(x)*50))
     ynew = map(f, xnew)
     
-    der = map(Cal_Derivative(Cal_Derivative(f)), x)
-    dernew = map(Cal_Derivative(Cal_Derivative(f)), xnew) 
+    der = map(f.derivative(n = 2), x)
+    dernew = map(f.derivative(n = 2), xnew)
     
     fig, left_axis = plt.subplots()
     right_axis = left_axis.twinx()
@@ -78,30 +69,26 @@ def Mark_Derivative(leaf):
     X, Y = [], [] 
     Get_XY(leaf, X, Y)
     Xnew, Ynew = LinearInterpolation(X, Y)
-
     Xnew, Ynew = LinearInterpolation(Xnew, Ynew)
-
-    global delta
-    delta = X[1]/1000000.
 
     f = interpolate.UnivariateSpline(Xnew, Ynew, k = 4)
     #f = interpolate.InterpolatedUnivariateSpline(Xnew, Ynew, k = 4)    
-    Sec_der = map(Cal_Derivative(Cal_Derivative(f)), X)
     
-    for node in leaf.path:
+    Sec_der = map(f.derivative(n = 2), X)
+    
+    for node in leaf.path:      
         der = Sec_der.pop(0)
 
         if node.is_leaf:
             node.der = 0
             node.parent.der = 0
-
         elif node.der is None:
             node.der = der
         else:
             node.der = filter(lambda x: abs(x)<=abs(der), (node.der, der))[0]
     
     Draw(f, X, Y) 
-    plt.savefig('Figs(UniSpl)/leaf%s.jpg'%leaf.id)
+    plt.savefig('Figs(UniSpl-derivative)/leaf%s.jpg'%leaf.id)
     plt.clf()
     plt.close('all')
     

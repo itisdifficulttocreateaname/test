@@ -7,6 +7,9 @@ from anytree import Node, RenderTree, AsciiStyle
 from anytree.dotexport import RenderTreeGraph
 from Radius_Change import Mark_Derivative
 
+import matplotlib.pyplot as plt 
+from scipy.stats import mode
+
 
 class NeuronNode(Node):
 	def __init__(self, id, type, x, y, z, r, pid):
@@ -28,9 +31,15 @@ class NeuronNode(Node):
 
 
 def stretch_type(list):
+
 	m, M = min(list), max(list)
-	def f(x):
-		return int((x-m)/(M-m)*255)
+	lmode = mode(list)[0][0]
+	scale = max(lmode-m, M-lmode)
+	
+	def f(x):		
+		return int(255/(1+math.exp(-12/scale*(x-lmode)))) #logistic 
+		#return int((x-m)/(M-m)*255) #linear
+	
 	return f
 
 
@@ -89,11 +98,14 @@ def createForest(swc):
 		for node in nodes:
 			node.type = f(node.der)
 		
+		#plt.plot([node.id for node in nodes],[node.type for node in nodes],'.')
+		#plt.show()
+				
 	return forest
 
 
 def print_tree_to_CSVFile(tree, spamwriter):
-	spamwriter.writerow([tree.id, tree.type, tree.r/2*0.0884, tree.der, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
+	spamwriter.writerow([tree.id, tree.type, tree.r*.5*0.0884, tree.der, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
 	for child in tree.children:
 		print_tree_to_CSVFile(child, spamwriter)
 
@@ -112,7 +124,7 @@ def print_forest_to_SWCFile(forest, filename):
 		for tree in forest:
 			nodes = (tree, ) + tree.descendants
 			for node in nodes:
-				swcfile.write('{0}, {1}, {2}, {3}, {4}, {5}, {6}\n'.format(node.id, node.type, node.x, node.y, node.z, node.r/2*0.0884, node.pid))
+				swcfile.write('{0}, {1}, {2}, {3}, {4}, {5}, {6}\n'.format(node.id, node.type, node.x, node.y, node.z, node.r*.5*0.0884, node.pid))
 		swcfile.flush()
 
 
