@@ -168,7 +168,7 @@ if __name__ == '__main__':
     testfile_path = os.path.join(abs_path, '..','test.swc')
     result_path = os.path.join(abs_path, '..', 'neuron.svg')
     forest = SWC2Forest(testfile_path)
-    Process(forest)
     MergeSoma(forest)
+    Process(forest)
     DrawSVG(forest, result_path)
 
