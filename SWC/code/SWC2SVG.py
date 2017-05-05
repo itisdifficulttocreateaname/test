@@ -8,9 +8,7 @@ import matplotlib.colors as colors
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 
-from Get_SWC_Info import readSWCFile, completeForest
 from StretchType import Stretch_Type
-
 from Get_SWC_Info import SWC2Forest
 
 
