@@ -7,8 +7,11 @@ from scipy import interpolate
 import numpy as np
 from copy import deepcopy
 
+from TreeNodes import TreeLeaves
+from TreeParaRescale import TreeParaRescale
 
-def Get_XY(leaf, X, Y):
+
+def _Get_XY(leaf, X, Y):
 
     node = leaf 
     while True:
@@ -19,7 +22,7 @@ def Get_XY(leaf, X, Y):
         node = node.parent
 
 
-def Draw(f, x, y):
+def _Draw(f, x, y):
 
     xnew = np.arange(min(x), max(x), (max(x)-min(x))/(len(x)*50))
     ynew = map(f, xnew)
@@ -40,7 +43,7 @@ def Draw(f, x, y):
     right_axis.set_ylabel('Second-order derivative')
 
 
-def LinearInterpolation(x, y):
+def _LinearInterpolation(x, y):
 
     f = interpolate.interp1d(x, y, kind = 'slinear')
     delta_y = np.median(tuple(abs(y[i]-y[i-1]) for i in range(1, len(x))))
@@ -62,14 +65,14 @@ def LinearInterpolation(x, y):
     return xnew, ynew
 
 
-def Mark_Derivative(leaf):
+def _Mark_Derivative(leaf):
 
     # X:'dist_to_root' of each node.
     # Y: radius 
     X, Y = [], [] 
-    Get_XY(leaf, X, Y)
-    Xnew, Ynew = LinearInterpolation(X, Y)
-    Xnew, Ynew = LinearInterpolation(Xnew, Ynew)
+    _Get_XY(leaf, X, Y)
+    Xnew, Ynew = _LinearInterpolation(X, Y)
+    Xnew, Ynew = _LinearInterpolation(Xnew, Ynew)
 
     f = interpolate.UnivariateSpline(Xnew, Ynew, k = 4)
     #f = interpolate.InterpolatedUnivariateSpline(Xnew, Ynew, k = 4)    
@@ -86,9 +89,37 @@ def Mark_Derivative(leaf):
             node.der = der
         else:
             node.der = filter(lambda x: abs(x)<=abs(der), (node.der, der))[0]
-    
-    Draw(f, X, Y) 
+    return f, X, Y
+
+
+def _Radii_plot(leaf):
+    f, X, Y = _Mark_Derivative(leaf)
+    _Draw(f, X, Y) 
     plt.savefig('Figs(UniSpl-derivative)/leaf%s.jpg'%leaf.id)
     plt.clf()
     plt.close('all')
+
+
+def MarkTreeDer(tree):
+    TreeParaRescale(tree, **{'r': 1/0.0884*2})
+
+    leaves = TreeLeaves(tree)
+    map(_Mark_Derivative, leaves)
+
+    TreeParaRescale(tree, **{'r': 0.5*0.0884})
+
+
+
+def PlotTree(tree):
+    TreeParaRescale(tree, **{'r': 1/0.0884*2})
+
+    leaves = TreeLeaves(tree)
+    map(_Radii_plot, leaves)
+
+    TreeParaRescale(tree, **{'r': 0.5*0.0884})
+   
+
+def PlotForest(forest):
+    for tree in forest:
+        PlotTree(tree)
     
