@@ -2,7 +2,7 @@
 #coding: utf-8
 
 def AllTreeNodes(tree):
-	return (tree, ) + tree.descendants
+    return (tree, ) + tree.descendants
 
 
 def TreeLeaves(tree):
