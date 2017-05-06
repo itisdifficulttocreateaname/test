@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 #coding: utf-8
 
 import sys
@@ -45,6 +45,8 @@ class NeuronNode(Node):
 
 
 def readSWCFile(filename):
+    if not filename.lower().endswith('.swc'):
+        IOError('Invalid file format: {0}'.format(filename))
     with open(filename, 'r') as f:
         return (line for line in f.readlines() if not line.startswith('#'))
 

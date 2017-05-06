@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+#coding: utf-8
 
 def AllTreeNodes(tree):
 	return (tree, ) + tree.descendants

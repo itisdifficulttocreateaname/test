@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 
 from StretchType import Stretch_Type
 from Get_SWC_Info import SWC2Forest
+from TreeNodes import AllTreeNodes
 
 
 def GetColor(ntype):
@@ -76,14 +77,78 @@ def NextBP(dwg, tree):
         return tree
 
 
+def read_file(filename):
+    with open(filename, 'r') as f:
+        return (line for line in f.readlines())
 
-def Tree2SVG(dwg, tree, color = 'lightblue'):
+
+def split_line(line):
+    return line.split()
+
+
+def is_valid_len(len):
+    return len == 6
+
+def is_valid_pos(pos):
+    return 0 <= pos and pos <= 1
+
+def is_valid_rgba(*args):
+    for arg in args:
+        if not (isinstance(arg, int) and 0 <= arg and arg <= 255):
+            return False
+    return True 
+
+
+def is_valid_decorator(line):
+    return is_valid_len(len(line)) and is_valid_pos(float(line[1])) and is_valid_rgba(map(lambda x: int(x), line[2:6]))
+
+
+def get_decorator(node_decorator_file):
+    lines = read_file(node_decorator_file)
+    decorator = {}    
+    for line in lines:
+        line = split_line(line)
+        if not is_valid_decorator(line):
+            Exception('Invalid decorator text!')
+        decorator[int(line[0])] = [float(line[1]),] + map(lambda x: int(x), line[2:6])
+
+    return decorator
+
+
+def decorate_node(tree, node_decorator):
+    decorator = get_decorator(node_decorator)
+    all_nodes = AllTreeNodes(tree)
+    for node in all_nodes:
+        if node.id in decorator:
+            pos = decorator[node.id][0]
+            node.rgb = svgwrite.rgb(*decorator[node.id][1:4])
+            node.alpha = decorator[node.id][4]/255.
+            node.xs_pos = node.xs*pos + node.parent.xs*(1-pos)
+            node.ys_pos = node.ys*pos + node.parent.ys*(1-pos)
+            decorator.pop(node.id)
+        else:
+            node.alpha = 0
+            node.rgb = svgwrite.rgb(0,0,0)
+            node.xs_pos, node.ys_pos = 0, 0
+
+    if decorator:
+        UserWarning('Decorator file has unused nodes!')
+
+
+def Tree2SVG(dwg, tree, node_decorator = None, color = 'lightblue'):
 
     if tree.is_leaf:
+        if node_decorator != None:
+            dwg.add(dwg.circle((tree.xs_pos, tree.ys_pos), 2,
+                                stroke = tree.rgb,
+                                fill = tree.rgb,
+                                stroke_opacity = tree.alpha))
+        '''
         dwg.add(dwg.circle((tree.xs, tree.ys), 2, 
                             stroke = svgwrite.rgb(*GetColor(tree.type)[:3]),
                             stroke_opacity = GetColor(tree.type)[3],
                             fill = svgwrite.rgb(*GetColor(tree.type)[:3])))
+        '''
         dwg.add(dwg.text('%.2f'%tree.dist_to_root,
                          insert = (tree.xs + 3, tree.ys + 3),
                          font_size = '8'))                
@@ -96,15 +161,22 @@ def Tree2SVG(dwg, tree, color = 'lightblue'):
                          (nextBP.xs, nextBP.ys), 
                          stroke = color if tree.sd_type != 1 else 'limegreen',
                          stroke_width = 2))
-        Tree2SVG(dwg, nextBP, color)
+        Tree2SVG(dwg, nextBP, node_decorator, color)
         node = nextBP
         while node != tree:
             node = node.parent
+        if node_decorator != None:
+            dwg.add(dwg.circle((node.xs_pos, node.ys_pos), 2,
+                                stroke = node.rgb,
+                                fill = node.rgb,
+                                stroke_opacity = node.alpha))
+
+            '''
             dwg.add(dwg.circle((node.xs, node.ys), 2, 
                                 stroke = svgwrite.rgb(*GetColor(node.type)[:3]),
                                 stroke_opacity = GetColor(node.type)[3],
                                 fill = svgwrite.rgb(*GetColor(node.type)[:3])))
-
+            '''
 
     else:
         dwg.add(dwg.line((tree.xs, tree.children[0].ys),
@@ -118,27 +190,36 @@ def Tree2SVG(dwg, tree, color = 'lightblue'):
                              stroke = 'darkgrey' if tree.N_BP == 0 and tree.children.index(child)%2 == 0 else color,
                              stroke_width = 2))
             
-            Tree2SVG(dwg, child, 'darkgrey' if tree.N_BP == 0 and tree.children.index(child)%2 == 0 else color)
+            Tree2SVG(dwg, child, node_decorator, 'darkgrey' if tree.N_BP == 0 and tree.children.index(child)%2 == 0 else color)
         
+        if node_decorator != None:
+            dwg.add(dwg.circle((tree.xs_pos, tree.ys_pos), 2,
+                                stroke = tree.rgb,
+                                fill = tree.rgb,
+                                stroke_opacity = tree.alpha))
+
+        '''
         dwg.add(dwg.circle((tree.xs, tree.ys), 2,
                             stroke = svgwrite.rgb(*GetColor(tree.type)[:3]),
                             stroke_opacity = GetColor(tree.type)[3],
                             fill = svgwrite.rgb(*GetColor(tree.type)[:3])))
-
+        '''
         dwg.add(dwg.text('%.2f'%tree.dist_to_root,
                  insert = (tree.xs + 3, tree.ys ),
                  font_size = '6'))                
 
 
 
-def DrawSVG(forest, SVGFile):
+def DrawSVG(forest, SVGFile, node_decorator = None):
     global n_leaf, yunit
 
     for tree in forest:
         _n_leaf(tree)
         _CalCoor(tree)
         dwg = svgwrite.Drawing(SVGFile, viewBox = "-100 0 1200 %s"%(n_leaf*yunit), preserveAspectRatio = 'center middle slice')
-        Tree2SVG(dwg, tree)
+        if node_decorator != None: 
+            decorate_node(tree, node_decorator)
+        Tree2SVG(dwg, tree, node_decorator)
         dwg.save()
 
 
@@ -159,16 +240,17 @@ def merge_soma(tree):
 
 
 def MergeSoma(forest):
-    map(merge_soma, forest)
+    for tree in forest:
+        if tree.sd_type != 1:
+            UserWarning('Root node is not a soma!')
+        else: 
+            merge_soma(tree)
 
 
-if __name__ == '__main__':
-    import os
-    abs_path = os.path.dirname(os.path.abspath(__file__))
-    testfile_path = os.path.join(abs_path, '..','test.swc')
-    result_path = os.path.join(abs_path, '..', 'neuron.svg')
-    forest = SWC2Forest(testfile_path)
-    MergeSoma(forest)
+def swc_svg(swcfile, svgfile, node_decorator = None, merge_soma = False):
+    forest = SWC2Forest(swcfile)
+    if merge_soma:
+        MergeSoma(forest)
     Process(forest)
-    DrawSVG(forest, result_path)
+    DrawSVG(forest, svgfile, node_decorator)
 
