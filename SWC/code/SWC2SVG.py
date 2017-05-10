@@ -97,15 +97,17 @@ def is_valid_pos(pos):
 
 def is_valid_rgba(*args):
     
-    for arg in args:
-        if not (isinstance(arg, int) and 0 <= arg and arg <= 255):
+    for arg in args[:3]:
+        if not (0 <= arg and arg <= 255):
             return False
+    if not (0 <= args[3] and args[3] <= 1):
+        return False
     
     return True 
 
 def is_valid_decorator(line):
     
-    return is_valid_len(len(line)) and is_valid_pos(float(line[1])) and is_valid_rgba(map(lambda x: int(x), line[2:6]))
+    return is_valid_len(len(line)) and is_valid_pos(float(line[1])) and is_valid_rgba(lambda x: float(x), line[2:6])
 
 
 
@@ -118,7 +120,7 @@ def get_decorator(node_decorator_file):
         line = split_line(line)
         if not is_valid_decorator(line):
             Exception('Invalid decorator text!')
-        decorator[line[0]] = [float(line[1]),] + map(lambda x: int(x), line[2:6])
+        decorator[line[0]] = [float(line[1]),] + map(lambda x: int(x), line[2:5]) + [float(line[5]),]
     
     return decorator
 
@@ -133,7 +135,7 @@ def decorate_node(tree, node_decorator):
         if node.id in decorator:
             pos = decorator[node.id][0]
             node.rgb = svgwrite.rgb(*decorator[node.id][1:4])
-            node.alpha = decorator[node.id][4]/255.
+            node.alpha = decorator[node.id][4]
             node.xs_pos = node.xs*pos + node.parent.xs*(1-pos) if not node.is_root else node.xs
             node.ys_pos = node.ys*pos + node.parent.ys*(1-pos) if not node.is_root else node.ys
             decorator.pop(node.id)
@@ -155,7 +157,8 @@ def Tree2SVG(dwg, tree, node_decorator = None, color = 'lightblue'):
             dwg.add(dwg.circle((tree.xs_pos, tree.ys_pos), 2,
                                 stroke = tree.rgb,
                                 fill = tree.rgb,
-                                stroke_opacity = tree.alpha))
+                                stroke_opacity = tree.alpha,
+                                fill_opacity = tree.alpha))
         
         dwg.add(dwg.text('%.2f'%tree.dist_to_root,
                          insert = (tree.xs + 3, tree.ys + 3),
@@ -180,7 +183,8 @@ def Tree2SVG(dwg, tree, node_decorator = None, color = 'lightblue'):
                 dwg.add(dwg.circle((node.xs_pos, node.ys_pos), 2,
                                     stroke = node.rgb,
                                     fill = node.rgb,
-                                    stroke_opacity = node.alpha))
+                                    stroke_opacity = node.alpha,
+                                    fill_opacity = node.alpha))
 
     else:
 
@@ -201,7 +205,8 @@ def Tree2SVG(dwg, tree, node_decorator = None, color = 'lightblue'):
             dwg.add(dwg.circle((tree.xs_pos, tree.ys_pos), 2,
                                 stroke = tree.rgb,
                                 fill = tree.rgb,
-                                stroke_opacity = tree.alpha))
+                                stroke_opacity = tree.alpha,
+                                fill_opacity = tree.alpha))
 
         dwg.add(dwg.text('%.2f'%tree.dist_to_root,
                  insert = (tree.xs + 3, tree.ys ),

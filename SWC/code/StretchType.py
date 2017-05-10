@@ -29,6 +29,7 @@ def stretch_type(tree):
     for node in all_nodes:
         node.sd_type = node.type 
         node.type = fstretch(node.der)
+        node.is_swollen = True if node.der <= 0 else False
 
 
 def Stretch_Type(forest):
