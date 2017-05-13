@@ -149,7 +149,7 @@ def decorate_node(tree, node_decorator):
 
 
 
-def Tree2SVG(dwg, tree, node_decorator = None, color = 'lightblue'):
+def Tree2SVG(dwg, tree, node_decorator = None, color = 'gainsboro'):
 
     if tree.is_leaf:
         
