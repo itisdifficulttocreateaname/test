@@ -4,6 +4,7 @@
 import matplotlib.colors as colors
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt 
+import numpy as np 
 
 from Get_SWC_Info import SWC2Forest
 from TreeNodes import AllTreeNodes
@@ -17,7 +18,6 @@ class Decorator(object):
         self.decorator_file = decorator_file
         self.colormap = colormap
         self.fp = None
-        self.array = [0, 255]
 
 
     def before_generation(self):
@@ -30,9 +30,8 @@ class Decorator(object):
         
         m = plt.get_cmap(self.colormap)
         scalarMap = cm.ScalarMappable(cmap = m)
-        scalarMap.set_array(self.array)
-        scalarMap.autoscale()
-        return scalarMap.to_rgba(node.type, bytes = True)
+        scalarMap.set_clim(0, 255)
+        return scalarMap.to_rgba(255 - node.type, bytes = True)
 
 
     def get_color(self, node):
