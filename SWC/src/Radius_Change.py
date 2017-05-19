@@ -125,7 +125,7 @@ def _Radii_plot(leaf):
     _Draw(f, X, Y) 
 
     abs_path = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(abs_path, '..', 'Figs', 'Figs(UniSpl-extent_two_nodes)')
+    output_path = os.path.join(abs_path, '..', 'Figs', 'Figs(UniSpl-extend_two_nodes)')
     plt.savefig('%s/leaf%s.png'%(output_path, leaf.id))
     plt.clf()
     plt.close('all')
