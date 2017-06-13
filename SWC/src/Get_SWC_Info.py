@@ -6,10 +6,14 @@ import math
 import csv
 from anytree import Node
 
-from Radius_Change import PlotForest
-from TreeNodes import AllTreeNodes
-from TreeParaRescale import TreeParaRescale
-from StretchType import Stretch_Type
+from Radius_Change import plot_tree, PLOT_DIR
+from StretchType import stretch_type
+from ele_manipulation import ele_mani
+from cmd import check_file
+
+X_RESCALE = 0.0884
+Y_RESCALE = 0.0884
+R_RESCALE = 0.0884
 
 
 class NeuronNode(Node):
@@ -19,6 +23,7 @@ class NeuronNode(Node):
         self.name = id
         self.id = id
         self.type = int(type)
+        self.sd_type = int(type)
         self.x = float(x) 
         self.y = float(y) 
         self.z = float(z) 
@@ -32,60 +37,73 @@ class NeuronNode(Node):
 
         self.der = None
 
+    @property
+    def all_nodes(self):
+        return (self.root, ) + self.root.descendants
 
-    def para_rescale(self, para, coe):
-        if para is 'x':
-            self.x *= coe
-        elif para is 'y':
-            self.y *= coe
-        elif para is 'z':
-            self.z *= coe
-        elif para is 'r':
-            self.r *= coe
+    @property
+    def all_leaves(self):
+        return filter(lambda node: node.is_leaf, self.all_nodes)
 
 
-def readSWCFile(filename):
-    if not filename.lower().endswith('.swc'):
-        IOError('Invalid file format: {0}'.format(filename))
+    def node_para_rescale(self, **rescale):
+        if 'x' in rescale:
+            self.x *= rescale['x']
+        if 'y' in rescale:
+            self.y *= rescale['y']
+        if 'z' in rescale:
+            self.z *= rescale['z']
+        if 'r' in rescale:
+            self.r *= rescale['r']
+
+    def tree_para_rescale(self, **rescale):
+        for node in self.all_nodes:
+            node.node_para_rescale(**rescale)
+        
+
+######################### SWC_FOREST ###########################
+
+def _read_swc(filename):
+    check_file(filename, 'swc')
     with open(filename, 'r') as f:
         return (line for line in f.readlines() if not line.startswith('#'))
 
 
-def d(n1, n2):  
+def _d(n1, n2):  
     return math.sqrt((n1.x - n2.x)**2 + (n1.y - n2.y)**2 + (n1.z - n2.z)**2)
 
 
-def parseLine(line):
+def _line_node(line):
     return NeuronNode(*line.split())
 
 
-def process(tree): #second section properties
+def _info_extract(tree): #second section properties
     if tree.is_root:
         tree.branch_node_num = 0
         tree.dist_to_root = 0
     else:
-        tree.dist_to_root = tree.parent.dist_to_root + d(tree, tree.parent)
+        tree.dist_to_root = tree.parent.dist_to_root + _d(tree, tree.parent)
         if not tree.parent.is_root and len(tree.siblings) > 0:
             tree.branch_node_num = tree.parent.branch_node_num + 1
         else:
             tree.branch_node_num = tree.parent.branch_node_num
     
     for child in tree.children:
-        process(child)
+        _info_extract(child)
     else:
         if tree.is_leaf:
             tree.dist_to_leaf = 0
 
         else:
-            dists = ((d(tree, child) + child.dist_to_leaf) for child in tree.children)
+            dists = ((_d(tree, child) + child.dist_to_leaf) for child in tree.children)
             tree.dist_to_leaf = min(dists)
 
 
-def createForest(swc):
+def _forest_create(swc):
     all_node = {}
     forest = []
     for line in swc: #first section properties
-        node = parseLine(line) 
+        node = _line_node(line) 
         all_node[node.name] = node
         if node.pid == '-1':
             forest.append(node)
@@ -94,68 +112,68 @@ def createForest(swc):
     return forest
 
 
-def completeForest(swc):
-    forest = createForest(swc)
+def _forest_complete(swc):
+    forest = _forest_create(swc)
     for tree in forest:
-        TreeParaRescale(tree, **{'x': 0.0884, 'y': 0.0884, 'r': 0.0884})
-        process(tree) #second section properties
+        tree.tree_para_rescale(x = X_RESCALE, y = Y_RESCALE, r = R_RESCALE)
+        _info_extract(tree) #second section properties
 
     return forest
 
 
-def SWC2Forest(filename, node_type = NeuronNode):
-    swc = readSWCFile(filename)
-    forest = completeForest(swc)
-    Stretch_Type(forest)
+def swc_forest(swc_file, node_type = NeuronNode):
+    swc = _read_swc(swc_file)
+    forest = _forest_complete(swc)
+    stretch_type(forest)
     return forest
 
+################################################################
 
-def print_tree_to_CSVFile(tree, spamwriter):
+####################### SWC__CSV_SWC ###########################
+
+@ele_mani
+def _tree_csv(tree, spamwriter):
     spamwriter.writerow([tree.id, tree.type, tree.r, tree.der, tree.branch_node_num, tree.dist_to_root, tree.dist_to_leaf])
-    for child in tree.children:
-        print_tree_to_CSVFile(child, spamwriter)
+    _tree_csv(tree.children, spamwriter)
 
 
-def print_forest_to_CSVFile(forest, filename):
+def _forest_csv(forest, filename):
     with open(filename, 'wb') as csvfile:
         spamwriter = csv.writer(csvfile, delimiter = ',', quotechar = '|', quoting = csv.QUOTE_MINIMAL)
         spamwriter.writerow(['Id', 'Type', 'Raius', 'Sec-order Der',  '#branch_points', 'Dist_to_root', 'Dist_to_leaf'])
-        for tree in forest:
-            print_tree_to_CSVFile(tree, spamwriter)
+        _tree_csv(forest, spamwriter)
 
 
-def print_tree_to_SWCFile(tree, swcfile):
-    nodes = AllTreeNodes(tree)
-    for node in nodes:
-        swcfile.write('{0}, {1}, {2}, {3}, {4}, {5}, {6}\n'.format(node.id, node.type, node.x, node.y, node.z, node.r, node.pid))
+@ele_mani
+def _tree_swc(tree, swcfile):
+    for node in tree.all_nodes:
+        swcfile.write('{id}, {type}, {x}, {y}, {z}, {r}, {pid}\n'.format(
+                        id = node.id, type = node.type, x = node.x, y = node.y, 
+                        z = node.z, r = node.r, pid = node.pid))
 
 
-def print_forest_to_SWCFile(forest, filename):
+def _forest_swc(forest, filename):
     with open(filename, 'wb') as swcfile:
         swcfile.write('# Id, Type, x, y, z, Radius, Parent\n')
-        for tree in forest:
-            print_tree_to_SWCFile(tree, swcfile)
-        swcfile.flush()
+        _tree_swc(forest, swcfile)
 
 
-def SWC_CSVorSWC(input_swcfile, **output):
-    forest = SWC2Forest(input_swcfile)
+def swc__csv_swc(input_swc, **output):
+    forest = swc_forest(input_swc)
     if 'csv' in output:
-        print_forest_to_CSVFile(forest, output['csv'])
+        _forest_csv(forest, output['csv'])
     if 'swc' in output:
-        print_forest_to_SWCFile(forest, output['swc'])
+        _forest_swc(forest, output['swc'])
 
+################################################################
 
-def main(plot = False):
-    abs_path = os.path.dirname(os.path.abspath(__file__))
-    testfile_path = os.path.join(abs_path, '..', 'test.swc')
+###################### SWC_PLOTS ###############################
+
+def swc_plots(input_swc, plot_dir = PLOT_DIR):
+    forest = swc_forest(input_swc)
+    plot_tree(forest, plot_dir)
     
-    if plot == True:
-        forest = SWC2Forest(testfile_path)
-        PlotForest(forest)
-
 
 if __name__ == '__main__':
-    import os
-    main(True)
+    swc_plots('01.10.17_SWC-e1.swc')
 

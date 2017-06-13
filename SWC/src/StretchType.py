@@ -4,13 +4,13 @@
 import math
 from scipy.stats import mode
 
-from Radius_Change import MarkTreeDer
-from TreeNodes import AllTreeNodes
+from Radius_Change import mark_all_ders
+from ele_manipulation import ele_mani
 
 
 def _Fstretch(list):
     m, M = min(list), max(list)
-    lmode = mode(list)[0][0]
+    lmode = 0
     scale = max(lmode - m, M - lmode)
 
     def fstretch(x):
@@ -18,29 +18,30 @@ def _Fstretch(list):
 
     return fstretch
 
-def is_der_loc_min(node):
-    if node.is_root or node.is_leaf:
+
+def _is_der_loc_min(node):
+    if node.is_root: 
         return False
     if node.der > node.parent.der:
         return False
+    if node.is_leaf:
+        return True
     for child in node.children:
         if node.der > child.der:
             return False
     return True
 
-def stretch_type(tree):
-    MarkTreeDer(tree)
 
-    all_nodes = AllTreeNodes(tree)
+@ele_mani
+def stretch_type(tree):
+    mark_all_ders(tree)
+
+    all_nodes = tree.all_nodes
     all_der = [node.der for node in all_nodes]
 
     fstretch = _Fstretch(all_der)
     for node in all_nodes:
-        node.sd_type = node.type 
         node.type = fstretch(node.der)
         node.is_swollen = True if node.der <= 0 else False        
-        node.is_der_loc_min = is_der_loc_min(node)
+        node.is_der_loc_min = _is_der_loc_min(node)
 
-
-def Stretch_Type(forest):
-    map(stretch_type, forest)

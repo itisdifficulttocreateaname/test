@@ -5,31 +5,23 @@ import os
 import argparse
 
 from SWC2SVG import swc_svg
+from cmd import filepath, check_args
 
 
-def get_output(output, default_name):
-    output_file = output    
-    if not output_file.endswith('.svg'):
-        if not os.path.isdir(output_file):
-            os.makedirs(output_file)
-        output_file = os.path.join(output_file, os.path.split(default_name)[1][:-4]+'.svg')
-    else:
-        if not os.path.isdir(os.path.split(output_file)[0]):
-            os.makedirs(os.path.split(output_file)[0])
+@check_args
+def _process_cmd(args):
+    output_file = filepath(args.o, args.input_file, format = 'svg')
     
-    return output_file
+    return args.input_file, output_file
 
+def _args_to_check(args):
+    vars(args)['check'] = {}
+    args.check['input_swc'] = [args.input_file, 'swc']
+    if args.node:
+        args.check['node_decorator'] = [args.node, 'txt']
 
-def process_cmd(input_file, output):
-    if not os.path.isfile(input_file):
-        IOError('{0} does not exists!'.format(input_file))
-        
-    output_file = get_output(output, input_file)
-    return input_file, output_file
+def main():
 
-
-if __name__ == '__main__':
-    
     parser = argparse.ArgumentParser()
     parser.add_argument('input_file')
     parser.add_argument('-o', action = 'store', default = r'./',
@@ -39,7 +31,14 @@ if __name__ == '__main__':
     parser.add_argument('--merge_soma', action = 'store_true',
                         help = 'merge all soma nodes')
     args = parser.parse_args()
+    _args_to_check(args)
 
-    swcfile, svgfile = process_cmd(args.input_file, args.o)
+    swcfile, svgfile = _process_cmd(args)
     swc_svg(swcfile, svgfile, args.node, args.merge_soma)
-    print('Successfully created svg file: %s'%svgfile)
+    print('Successfully created svg file: {svgfile}'.format(svgfile = svgfile))
+
+
+
+if __name__ == '__main__':
+    
+    main()

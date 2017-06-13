@@ -8,11 +8,17 @@ from scipy import interpolate
 import numpy as np
 from copy import deepcopy
 
-from TreeNodes import TreeLeaves
-from TreeParaRescale import TreeParaRescale
+from ele_manipulation import ele_mani
+
+R_RESCALE = 0.0884
+R_STRETCH = 2
+SYM_EXT_N = 2
+SPL_ORDER = 4
+DER_ORDER = 2
+PLOT_DIR = './Figs/Figs(UniSpl-extend_two_nodes)'
 
 
-def _Get_XY(leaf, X, Y):
+def _leaf_XY(leaf, X, Y):
 
     node = leaf 
     while True:
@@ -23,25 +29,20 @@ def _Get_XY(leaf, X, Y):
         node = node.parent
 
 
-def _Draw(f, x, y):
-
-    xnew = np.arange(min(x), max(x), (max(x)-min(x))/(len(x)*50))
-    ynew = map(f, xnew)
-    
-    der = map(f.derivative(n = 2), x)
-    dernew = map(f.derivative(n = 2), xnew)
-    
-    fig, left_axis = plt.subplots()
-    right_axis = left_axis.twinx()
-
-    p1, = left_axis.plot(xnew, ynew, 'b-')
-    p1, = left_axis.plot(x, y, 'bo')  
-    p2, = right_axis.plot(xnew, dernew, 'r:')
-    p2, = right_axis.plot(x, der, 'r.')
-
-    left_axis.set_xlabel('Distance to root')
-    left_axis.set_ylabel('Radius')
-    right_axis.set_ylabel('Second-order derivative')
+def _sym_extend(X, Y, n = SYM_EXT_N):
+    if len(X) >= 3:
+        X_ext, Y_ext = deepcopy(X), deepcopy(Y)
+        X_ext = X_ext + map(lambda x: 2*X_ext[-1]-x, X_ext[-2:-2-n:-1])
+        Y_ext = Y_ext + Y_ext[-2:-2-n:-1]
+        return X_ext, Y_ext
+    elif len(X) == 2:
+        n = 1
+        X_ext, Y_ext = deepcopy(X), deepcopy(Y)
+        X_ext = X_ext + X_ext[-2:-2-n:-1]
+        Y_ext = Y_ext + Y_ext[-2:-2-n:-1]
+        return X_ext, Y_ext
+    else:
+        pass
 
 
 def _LinearInterpolation(x, y):
@@ -75,82 +76,74 @@ def _LinearInterpolation(x, y):
     return xnew, ynew
 
 
-def symmetric_extension(X, Y, n = 2):
-    if len(X) >= 3:
-        X_ext, Y_ext = deepcopy(X), deepcopy(Y)
-        X_ext = X_ext + map(lambda x: 2*X_ext[-1]-x, X_ext[-2:-2-n:-1])
-        Y_ext = Y_ext + Y_ext[-2:-2-n:-1]
-        return X_ext, Y_ext
-    elif len(X) == 2:
-        n = 1
-        X_ext, Y_ext = deepcopy(X), deepcopy(Y)
-        X_ext = X_ext + X_ext[-2:-2-n:-1]
-        Y_ext = Y_ext + Y_ext[-2:-2-n:-1]
-        return X_ext, Y_ext
-    else:
-        pass
-
-
-def _Mark_Derivative(leaf, extension_n = 2):
-
-    # X:'dist_to_root' of each node.
-    # Y: radius 
+@ele_mani
+def _generate_der(leaf, extent_n = SYM_EXT_N):
     X, Y = [], [] 
-    _Get_XY(leaf, X, Y)
+    _leaf_XY(leaf, X, Y)
 
-    X_ext, Y_ext = symmetric_extension(X, Y, extension_n)
+    X_ext, Y_ext = _sym_extend(X, Y, extent_n)
     Xnew, Ynew = _LinearInterpolation(X_ext, Y_ext)
     Xnew, Ynew = _LinearInterpolation(Xnew, Ynew)
 
-    f = interpolate.UnivariateSpline(Xnew, Ynew, k = 4)  
-    #f = interpolate.InterpolatedUnivariateSpline(Xnew, Ynew, k = 4)    
+    f = interpolate.UnivariateSpline(Xnew, Ynew, k = SPL_ORDER)      
     
-    Sec_der = map(f.derivative(n = 2), X)
-    
-    for node in leaf.path:      
-        der = Sec_der.pop(0)
-        if node.is_leaf:
-            node.der = 0
-            node.parent.der = 0
-        elif node.der is None:
-            node.der = der
-        else:
-            node.der = filter(lambda x: abs(x)<=abs(der), (node.der, der))[0]
-    
+    for index, node in enumerate(leaf.path):
+        der = f.derivative(n = DER_ORDER)(X[index])
+        node.der = filter(lambda x: abs(x) <= abs(der), (node.der, der))[0] if node.der else der
+
     return f, X, Y
 
+####################### MARK_ALL_DERS ##########################
 
-def _Radii_plot(leaf):
-    f, X, Y = _Mark_Derivative(leaf)
+def mark_all_ders(tree, extent_n = SYM_EXT_N):
+    tree.tree_para_rescale(r = 1. / R_RESCALE * R_STRETCH)
+
+    _generate_der(tree.all_leaves, extent_n)
+
+    tree.tree_para_rescale(r = 1. * R_RESCALE / R_STRETCH)
+
+################################################################
+
+####################### PLOT_TREE ##############################
+
+def _Draw(f, x, y):
+
+    xnew = np.arange(min(x), max(x), (max(x)-min(x))/(len(x)*50))
+    ynew = map(f, xnew)
+    
+    der = map(f.derivative(n = 2), x)
+    dernew = map(f.derivative(n = 2), xnew)
+    
+    fig, left_axis = plt.subplots()
+    right_axis = left_axis.twinx()
+
+    p1, = left_axis.plot(xnew, ynew, 'b-')
+    p1, = left_axis.plot(x, y, 'bo')  
+    p2, = right_axis.plot(xnew, dernew, 'r:')
+    p2, = right_axis.plot(x, der, 'r.')
+
+    left_axis.set_xlabel('Distance to root')
+    left_axis.set_ylabel('Radius')
+    right_axis.set_ylabel('Second-order derivative')
+
+
+@ele_mani
+def _radii_plot(leaf, plot_dir = PLOT_DIR):
+
+    f, X, Y = _generate_der(leaf)
     _Draw(f, X, Y) 
 
-    abs_path = os.path.dirname(os.path.abspath(__file__))
-    output_path = os.path.join(abs_path, '..', 'Figs', 'Figs(UniSpl-extend_two_nodes)')
-    plt.savefig('%s/leaf%s.png'%(output_path, leaf.id))
+    plt.savefig(plot_dir + '/leaf{id}.png'.format(id = leaf.id))
     plt.clf()
     plt.close('all')
 
 
-def MarkTreeDer(tree):
-    TreeParaRescale(tree, **{'r': 1/0.0884*2})
+@ele_mani
+def plot_tree(tree, plot_dir = PLOT_DIR):
+    tree.tree_para_rescale(r = 1. / R_RESCALE * R_STRETCH)
 
-    leaves = TreeLeaves(tree)
-    map(_Mark_Derivative, leaves)
+    _radii_plot(tree.all_leaves, plot_dir)
 
-    TreeParaRescale(tree, **{'r': 0.5*0.0884})
-
-
-
-def PlotTree(tree):
-    TreeParaRescale(tree, **{'r': 1/0.0884*2})
-
-    leaves = TreeLeaves(tree)
-    map(_Radii_plot, leaves)
-
-    TreeParaRescale(tree, **{'r': 0.5*0.0884})
+    tree.tree_para_rescale(r = 1. * R_RESCALE / R_STRETCH)
    
-
-def PlotForest(forest):
-    for tree in forest:
-        PlotTree(tree)
-    
+################################################################

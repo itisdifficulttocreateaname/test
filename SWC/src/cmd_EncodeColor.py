@@ -6,8 +6,8 @@ import os
 import argparse
 import numpy as np 
 
-from Get_SWC_Info import SWC2Forest
-from TreeNodes import AllTreeNodes
+from Get_SWC_Info import swc_forest
+from cmd import filepath, check_args
 
 
 class Decorator(object):
@@ -15,21 +15,25 @@ class Decorator(object):
     def __init__(self, tree_root, decorator_file, colormap_file, pos = 0.0):
         super(Decorator, self).__init__()
         self.tree = tree_root
+        self._pos = None
         self.pos = float(pos)
         self.decorator_file = decorator_file
         self.colormap = colormap_file
         self.decorator_fp = None
         self.colormap_fp = None
 
+    @property
+    def pos(self):
+        return self._pos
 
-    def before_generation(self):
-        
-        if not (0 <= self.pos and self.pos <= 1):
-            Exception('''"pos" should fall in interval [0, 1]!''')
-
+    @pos.setter
+    def pos(self, new_value):
+        if new_value < 0 or new_value > 1:
+            raise Exception("'pos' should fall in interval [0, 1]!")
+        else:
+            self._pos = new_value
 
     def parse_colormap_file(self):
-
         colormap = {}
         with open(self.colormap, 'r') as self.colormap_fp:
             for line in self.colormap_fp.readlines():
@@ -44,15 +48,14 @@ class Decorator(object):
         
         for item in list:
             if item < num:
-                m = item if m is None else max(item, m)
+                m = item if not m else max(item, m)
             else:
-                M = item if M is None else min(item, M)
+                M = item if not M else min(item, M)
 
         return m, M
 
 
     def _get_color(self, node):
-
         colormap = self.parse_colormap_file()
         min_color_index = min(colormap.keys())
         max_color_index = max(colormap.keys())
@@ -84,12 +87,11 @@ class Decorator(object):
             r, g, b, a = self.get_color(node)
             self.decorator_fp.write('{id} {pos} {r} {g} {b} {a}\n'.format(id = node.id, pos = self.pos,
                                                                 r = r, g = g, b = b, a = a)) 
-        for child in node.children:
-            self.generate_decorator(child)
+        
+        map(self.generate_decorator, node.children)
 
 
     def write_to_file(self):       
-        self.before_generation()        
         with open(self.decorator_file, 'wb') as self.decorator_fp:
             self.generate_decorator(self.tree)
 
@@ -97,53 +99,25 @@ class Decorator(object):
 
 def swc_decorator(swcfile, decorator_file, colormap_file, pos = 0.0):
     
-    forest = SWC2Forest(swcfile)
+    forest = swc_forest(swcfile)
     for tree in forest:
         decorator = Decorator(tree, decorator_file, colormap_file)
         decorator.write_to_file()
 
 
-
-def get_output(output, default_name):
-    
-    output_file = output
-    
-    if not output_file.endswith('.txt'):
-        if not os.path.isdir(output_file):
-            os.makdirs(output_file)
-        output_file = os.path.join(output_file, os.path.split(default_name)[1][:-4]+'_decorator.txt')
-    
-    else:
-        if not os.path.isdir(os.path.split(output_file)[0]):
-            os.makdirs(os.path.split(output_file)[0])
-
-    return output_file
-
-
-
-def process_command(args):    
-    check_arguments(args)
-    output_file = get_output(args.o, args.input_file)
+@check_args
+def _process_cmd(args):    
+    output_file = filepath(args.o, args.input_file, format = 'txt', suffix = 'decorator')
 
     return args.input_file, output_file, args.color_map
 
-
-def check_arguments(args):
-    if args.color_map is None:
-        sys.exit('Colormap is needed!')
-
-    if not args.input_file.lower().endswith('.swc'):
-        sys.exit('Wrong input format!')
-    elif not os.path.isfile(args.input_file):
-        sys.exit('{} does not exists!'.format(args.input_file))
-    
-    if not os.path.isfile(args.color_map):
-        sys.exit('{} does not exists!'.format(args.color_map))
+def _args_to_check(args):
+    vars(args)['check'] = {}
+    args.check['input_swc'] = [args.input_file, 'swc']
+    args.check['color_map'] = [args.color_map, 'txt']
 
 
-
-if __name__ == '__main__':
-
+def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('input_file', help = 'swc format file')
     parser.add_argument('-o', action = 'store', default = r'./',
@@ -151,8 +125,15 @@ if __name__ == '__main__':
     parser.add_argument('--color_map', action = 'store', default = None,
                         help = 'txt format colormap file')
     args = parser.parse_args()
+    _args_to_check(args)
 
-    swc_file, decorator_file, colormap_file = process_command(args)
+    swc_file, decorator_file, colormap_file = _process_cmd(args)
     swc_decorator(swc_file, decorator_file, colormap_file)
     
     print('Successfully created %s!'%decorator_file)
+
+
+
+if __name__ == '__main__':
+
+    main()

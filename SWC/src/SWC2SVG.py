@@ -4,273 +4,257 @@
 import math
 import numpy as np 
 import svgwrite
+import warnings
 
-from StretchType import Stretch_Type
-from Get_SWC_Info import SWC2Forest
-from TreeNodes import AllTreeNodes
+from Get_SWC_Info import swc_forest
+from ele_manipulation import ele_mani
 
 
-def process(tree):
+X_SCALE = 0
+Y_UNIT = 15
+CIRCLE_RADII = 2
+TEXT_X = 3
+TEXT_Y = 3
+FONT_SIZE = 8
+STROKE_WIDTH = 2
+STROKE_1 = 'gainsboro'
+STROKE_2 = 'darkgrey'
+SOMA_COLOR = 'limegreen'
+STROKE_VERTICAL = 'black'
 
-    if tree.is_root:
-        tree.N_BP = 0    
+
+########################## MERGE_SOMA ##########################
+
+@ele_mani
+def _merge(childsoma, soma):
+    if childsoma.sd_type != 1:
+        pass
     else:
-        tree.N_BP = tree.parent.N_BP if len(tree.siblings) == 0 else tree.parent.N_BP + 1
+        for child in childsoma.children:
+            child.parent = soma
+
+        childsoma.parent = None
+
+
+@ele_mani
+def _merge_soma(tree):
     
-    for child in tree.children:
-        process(child)
-
-
-
-def Process(forest):
-    map(process, forest)
-
-
-
-xscale = 0
-n_leaf = 0
-
-def _n_leaf(tree):
-    
-    global n_leaf, xscale
-
-    if tree.is_leaf:
-        n_leaf += 1
-        tree.lId = n_leaf
-        if tree.dist_to_root > xscale:
-            xscale = tree.dist_to_root
+    if tree.sd_type != 1:        
+        pass
     else:
-        for child in tree.children:
-            _n_leaf(child)
+        _merge_soma(tree.children)
+        _merge(tree.children, tree)
+
+################################################################
 
 
+######################### DECORATE_NODE ########################
 
-yunit = 15
-
-def _CalCoor(tree):
-    
-    global yunit
-
-    for child in tree.children:
-        _CalCoor(child)    
-    else:
-        tree.xs = tree.dist_to_root * (1000./xscale)
-        tree.ys = yunit * tree.lId if tree.is_leaf else .5*(max(child.ys for child in tree.children)+
-                                                            min(child.ys for child in tree.children))
-
-
-
-_n_BP = 0
-
-def NextBP(dwg, tree):
-    
-    global _n_BP     
-    
-    if len(tree.children) == 1:
-        _n_BP += 1
-        return NextBP(dwg, tree.children[0])
-    else:
-        return tree
-
-
-
-def read_file(filename):
-    
+def _read_file(filename):   
     with open(filename, 'r') as f:
         return (line for line in f.readlines())
 
-
-
-def split_line(line):
-    
+def _split_line(line):    
     return line.split()
 
+### IS_VALID_DECORATOR_LINE ####
 
+def _is_valid_len(len):    
+    if not len == 6:
+        raise Exception('Each line includes six elements!')
 
-def is_valid_len(len):
+def _is_valid_pos(pos):    
+    if not 0 <= pos and pos <= 1:
+        raise Exception('Pos should fall in [0, 1]!')
+
+def _is_valid_rgba(rgba):    
+    for rgb in rgba[:3]:
+        if not (0 <= rgb and rgb <= 255):
+            raise Exception('Wrong rgb value! (integers between 0 and 255 are expected)')
+    if not (0 <= rgba[3] and rgba[3] <= 1):
+        raise Exception('Wrong alpha value! (float between 0 and 1 is expected)')
     
-    return len == 6
+def _is_valid_decorator(line):    
+    _is_valid_len(len(line))  
+    _is_valid_pos(float(line[1]))  
+    _is_valid_rgba(map(lambda x: float(x), line[2:6]))
 
-def is_valid_pos(pos):
+################################
+
+def get_decorator(decorator_file):
     
-    return 0 <= pos and pos <= 1
-
-def is_valid_rgba(*args):
-    
-    for arg in args[:3]:
-        if not (0 <= arg and arg <= 255):
-            return False
-    if not (0 <= args[3] and args[3] <= 1):
-        return False
-    
-    return True 
-
-def is_valid_decorator(line):
-    
-    return is_valid_len(len(line)) and is_valid_pos(float(line[1])) and is_valid_rgba(lambda x: float(x), line[2:6])
-
-
-
-def get_decorator(node_decorator_file):
-    
-    lines = read_file(node_decorator_file)
+    lines = _read_file(decorator_file)
     decorator = {}    
     
     for line in lines:
-        line = split_line(line)
-        if not is_valid_decorator(line):
-            Exception('Invalid decorator text!')
+        line = _split_line(line)
+        _is_valid_decorator(line)
+
         decorator[line[0]] = [float(line[1]),] + map(lambda x: int(x), line[2:5]) + [float(line[5]),]
     
     return decorator
 
 
+def _linear_interpolate(node, pos):
+    node.xs_pos = node.xs*(1-pos) + node.parent.xs*pos if not node.is_root else node.xs
+    node.ys_pos = node.ys*(1-pos) + node.parent.ys*pos if not node.is_root else node.ys    
 
-def decorate_node(tree, node_decorator):
+
+def decorate_nodes(tree, decorator_file):
+
+    decorator = get_decorator(decorator_file)
     
-    decorator = get_decorator(node_decorator)
-    all_nodes = AllTreeNodes(tree)
-    
-    for node in all_nodes:
+    for node in tree.all_nodes:
+        
         if node.id in decorator:
+            
             pos = decorator[node.id][0]
             node.rgb = svgwrite.rgb(*decorator[node.id][1:4])
             node.alpha = decorator[node.id][4]
-            node.xs_pos = node.xs*(1-pos) + node.parent.xs*pos if not node.is_root else node.xs
-            node.ys_pos = node.ys*(1-pos) + node.parent.ys*pos if not node.is_root else node.ys
+            
+            _linear_interpolate(node, pos)
             decorator.pop(node.id)
+        
         else:
             node.alpha = 0
             node.rgb = svgwrite.rgb(0,0,0)
             node.xs_pos, node.ys_pos = 0, 0
 
     if decorator:
-        UserWarning('Decorator file has unused nodes!')
+        warnings.warn('Decorator file has unused nodes!')
+
+################################################################
 
 
+########################## Tree2SVG ############################
 
-def Tree2SVG(dwg, tree, node_decorator = None, color = 'gainsboro'):
+def _next_BP(tree):    
+    while len(tree.children) == 1:
+          tree = tree.children[0]  
+    return tree #real BP or leaf
+
+
+def svg_circle(dwg, node, radii = CIRCLE_RADII):
+    dwg.add(dwg.circle((node.xs_pos, node.ys_pos), radii,
+                        stroke = node.rgb,
+                        fill = node.rgb,
+                        stroke_opacity = node.alpha,
+                        fill_opacity = node.alpha))
+
+def svg_node_text(dwg, node, text_x = TEXT_X, text_y = TEXT_Y, font_size = FONT_SIZE):
+    dwg.add(dwg.text('%.2f'%node.dist_to_root,
+                     insert = (node.xs + text_x, node.ys + text_y),
+                     font_size = font_size))
+
+def svg_leaf(dwg, tree, decorator_file = None):    
+    if decorator_file:
+        svg_circle(dwg, tree)
+
+    svg_node_text(dwg, tree)
+
+def svg_node_line(dwg, node1, node2, stroke = STROKE_1, stroke_width = STROKE_WIDTH):
+    dwg.add(dwg.line((node1.xs, node1.ys), (node2.xs, node2.ys), 
+                     stroke = stroke, stroke_width = stroke_width))
+
+
+def tree_svg(dwg, tree, decorator_file = None, color = STROKE_1, soma_color = SOMA_COLOR):
 
     if tree.is_leaf:
-        
-        if node_decorator != None:
-            dwg.add(dwg.circle((tree.xs_pos, tree.ys_pos), 2,
-                                stroke = tree.rgb,
-                                fill = tree.rgb,
-                                stroke_opacity = tree.alpha,
-                                fill_opacity = tree.alpha))
-        
-        dwg.add(dwg.text('%.2f'%tree.dist_to_root,
-                         insert = (tree.xs + 3, tree.ys + 3),
-                         font_size = '8'))                
+        svg_leaf(dwg, tree, decorator_file)
+    
+    elif len(tree.children) == 1:        
+        nextBP = _next_BP(tree)
+        svg_node_line(dwg, tree, nextBP, stroke = color if tree.sd_type != 1 else soma_color)
 
-    elif len(tree.children) == 1:
+        tree_svg(dwg, nextBP, decorator_file, color)
         
-        global _n_BP 
-        _n_BP = 0
-        nextBP = NextBP(dwg, tree)
-        dwg.add(dwg.line((tree.xs, tree.ys), 
-                         (nextBP.xs, nextBP.ys), 
-                         stroke = color if tree.sd_type != 1 else 'limegreen',
-                         stroke_width = 2))
-        
-        Tree2SVG(dwg, nextBP, node_decorator, color)
-        
-        node = nextBP
-        while node != tree:
-            node = node.parent
-            if node_decorator != None:
-                dwg.add(dwg.circle((node.xs_pos, node.ys_pos), 2,
-                                    stroke = node.rgb,
-                                    fill = node.rgb,
-                                    stroke_opacity = node.alpha,
-                                    fill_opacity = node.alpha))
+        if decorator_file:
+            node = nextBP
+            while node != tree:
+                node = node.parent
+                svg_circle(dwg, node)
 
-    else:
-
+    else: #BP
         dwg.add(dwg.line((tree.xs, tree.children[0].ys),
                          (tree.xs, tree.children[-1].ys),
-                         stroke = 'black' if tree.sd_type != 1 else 'limegreen',
+                         stroke = STROKE_VERTICAL if tree.sd_type != 1 else soma_color,
                          stroke_width = .5))
         
-        for child in tree.children:            
+        for child in tree.children:
             dwg.add(dwg.line((tree.xs, child.ys),
                              (child.xs, child.ys),
-                             stroke = 'darkgrey' if tree.N_BP == 0 and tree.children.index(child)%2 == 0 else color,
-                             stroke_width = 2))
+                             stroke = STROKE_2 if tree.n_BP_before == 0 and tree.children.index(child)%2 == 0 else color,
+                             stroke_width = STROKE_WIDTH))
             
-            Tree2SVG(dwg, child, node_decorator, 'darkgrey' if tree.N_BP == 0 and tree.children.index(child)%2 == 0 else color)
+            tree_svg(dwg, child, decorator_file, STROKE_2 if tree.n_BP_before == 0 and tree.children.index(child)%2 == 0 else color)
         
-        if node_decorator != None:
-            dwg.add(dwg.circle((tree.xs_pos, tree.ys_pos), 2,
-                                stroke = tree.rgb,
-                                fill = tree.rgb,
-                                stroke_opacity = tree.alpha,
-                                fill_opacity = tree.alpha))
+        if decorator_file:
+            svg_circle(dwg, tree)
 
-        dwg.add(dwg.text('%.2f'%tree.dist_to_root,
-                 insert = (tree.xs + 3, tree.ys ),
-                 font_size = '6'))                
+        svg_node_text(dwg, tree, 3, 0, 6)
 
+################################################################
 
+########################### SWC_SVG ############################
 
-def DrawSVG(forest, SVGFile, node_decorator = None):
-    
-    global n_leaf, yunit
-
-    for tree in forest:
-        
-        _n_leaf(tree)
-        _CalCoor(tree)
-        dwg = svgwrite.Drawing(SVGFile, viewBox = "-100 0 1200 %s"%(n_leaf*yunit), preserveAspectRatio = 'center middle slice')
-        
-        if node_decorator != None: 
-            decorate_node(tree, node_decorator)
-        
-        Tree2SVG(dwg, tree, node_decorator)
-        dwg.save()
-
-
-
-def merge(soma, childsoma):
-    
-    for child in childsoma.children:
-        child.parent = soma
-    
-    childsoma.parent = None
-
-
-
-def merge_soma(tree):
-    
-    if tree.sd_type != 1:        
-        pass
+@ele_mani
+def _n_BP(tree):
+    if tree.is_root:
+        tree.n_BP_before = 0    
     else:
-        for child in tree.children:
-            if child.sd_type == 1:
-                merge_soma(child)
-                merge(tree, child)
-
-
-
-def MergeSoma(forest):
+        tree.n_BP_before = tree.parent.n_BP_before if len(tree.siblings) == 0 else tree.parent.n_BP_before + 1
     
-    for tree in forest:        
-        if tree.sd_type != 1:
-            UserWarning('Root node is not a soma!')
-        else: 
-            merge_soma(tree)
+    _n_BP(tree.children)
+
+
+def _leaf_id_XSCALE(tree):
+    global X_SCALE
+    for index, leaf in enumerate(tree.all_leaves):
+        leaf.lId = index
+        X_SCALE = max(X_SCALE, leaf.dist_to_root)
+
+
+def _coordinate(tree):    
+    global Y_UNIT
+
+    for child in tree.children:
+        _coordinate(child)    
+    else:
+        tree.xs = tree.dist_to_root * (1000./X_SCALE)
+        tree.ys = Y_UNIT * tree.lId if tree.is_leaf else 0.5*(max(child.ys for child in tree.children)+
+                                                            min(child.ys for child in tree.children))
+
+
+@ele_mani
+def plot_svg(tree, SVGFile, node_decorator = None):
+    
+    global Y_UNIT
+        
+    _leaf_id_XSCALE(tree)
+    n_leaf = len(tree.all_leaves)
+    yscale = n_leaf * Y_UNIT
+
+    _coordinate(tree)
+    dwg = svgwrite.Drawing(SVGFile, viewBox = "-100 0 1200 {yscale}".format(yscale = yscale), 
+                                    preserveAspectRatio = 'center middle slice')
+    
+    if node_decorator:
+        decorate_nodes(tree, node_decorator)
+    
+    tree_svg(dwg, tree, node_decorator)
+    dwg.save()
 
 
 
 def swc_svg(swcfile, svgfile, node_decorator = None, merge_soma = False):
     
-    forest = SWC2Forest(swcfile)
+    forest = swc_forest(swcfile)
     
     if merge_soma:
-        MergeSoma(forest)
+        _merge_soma(forest)
     
-    Process(forest)
-    DrawSVG(forest, svgfile, node_decorator)
+    _n_BP(forest)
+    plot_svg(forest, svgfile, node_decorator)
 
+################################################################
 

@@ -4,38 +4,21 @@
 import os
 import argparse
 
-from Get_SWC_Info import SWC_CSVorSWC
+from Get_SWC_Info import swc__csv_swc
+from cmd import filepath, check_args
 
 
-def get_output(output_csv, output_swc, default_name):
-    output_csvfile = output_csv    
-    output_swcfile = output_swc   
-    if not output_csvfile.endswith('.csv'):
-        if not os.path.isdir(output_csvfile):
-            os.makedirs(output_csvfile)
-        output_csvfile = os.path.join(output_csvfile, os.path.split(default_name)[1][:-4]+'_info.csv')
-    else:
-        if not os.path.isdir(os.path.split(output_csvfile)[0]):
-            os.makedirs(os.path.split(output_csvfile)[0])
-    
-    if not output_swcfile.endswith('.swc'):
-        if not os.path.isdir(output_swcfile):
-            os.makedirs(output_swcfile)
-        output_swcfile = os.path.join(output_swcfile, os.path.split(default_name)[1][:-4]+'_info.swc')
-    else:
-        if not os.path.isdir(os.path.split(output_swcfile)[0]):
-            os.makedirs(os.path.split(output_swcfile)[0])
-    
-    return output_csvfile, output_swcfile
+@check_args
+def _process_cmd(args):
+
+    output_csvfile = filepath(args.output_csvfile, args.input_swcfile, format = 'csv', suffix = 'info') 
+    output_swcfile = filepath(args.output_swcfile, args.input_swcfile, format = 'swc', suffix = 'info')
+    return args.input_swcfile, output_csvfile, output_swcfile
 
 
-
-def process_cmd(input_swcfile, output_csv, output_swc):
-    if not os.path.isfile(input_swcfile):
-        IOError('{} does not exists!'.format(input_swcfile))
-
-    output_csvfile, output_swcfile = get_output(output_csv, output_swc, input_swcfile)
-    return input_swcfile, output_csvfile, output_swcfile
+def _args_to_check(args):
+    vars(args)['check'] = {}
+    args.check['input_swc'] = [args.input_swcfile, 'swc']
 
 
 def main():
@@ -47,10 +30,11 @@ def main():
     parser.add_argument('-s', '--output_swcfile', action = 'store', default = r'./',
                         help = 'output swc filename of directory')
     args = parser.parse_args()
+    _args_to_check(args)
 
-    input_swcfile, output_csvfile, output_swcfile = process_cmd(args.input_swcfile, args.output_csvfile, args.output_swcfile)
+    input_swcfile, output_csvfile, output_swcfile = _process_cmd(args)
 
-    SWC_CSVorSWC(input_swcfile, csv = output_csvfile, swc = output_swcfile)
+    swc__csv_swc(input_swcfile, csv = output_csvfile, swc = output_swcfile)
     print('Successfully created %s!\nSuccessfully created %s!'%(output_csvfile, output_swcfile))
 
 
