@@ -11,9 +11,15 @@ from StretchType import stretch_type
 from ele_manipulation import ele_mani
 from cmd import check_file
 
-X_RESCALE = 0.0884
-Y_RESCALE = 0.0884
-R_RESCALE = 0.0884
+#X_RESCALE = 0.0884
+#Y_RESCALE = 0.0884
+X_RESCALE = 0.221180865682821
+Y_RESCALE = 0.221180865682821
+X_RESCALE = 0.110590432841411
+Y_RESCALE = 0.110590432841411
+Z_RESCALE = 0.7
+Z_RESCALE = 1.0
+R_RESCALE = 1.0
 
 
 class NeuronNode(Node):
@@ -115,7 +121,7 @@ def _forest_create(swc):
 def _forest_complete(swc):
     forest = _forest_create(swc)
     for tree in forest:
-        tree.tree_para_rescale(x = X_RESCALE, y = Y_RESCALE, r = R_RESCALE)
+        tree.tree_para_rescale(x = X_RESCALE, y = Y_RESCALE, z = Z_RESCALE, r = R_RESCALE)
         _info_extract(tree) #second section properties
 
     return forest
@@ -175,5 +181,5 @@ def swc_plots(input_swc, plot_dir = PLOT_DIR):
     
 
 if __name__ == '__main__':
-    swc_plots('01.10.17_SWC-e1.swc')
+    swc_plots('../test/01.10.17_SWC-e1/01.10.17_SWC-e1.swc', '../Figs/Figs(UniSpl-extend_two_nodes)')
 

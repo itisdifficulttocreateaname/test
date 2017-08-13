@@ -19,7 +19,7 @@ FONT_SIZE = 8
 STROKE_WIDTH = 2
 STROKE_1 = 'gainsboro'
 STROKE_2 = 'darkgrey'
-SOMA_COLOR = 'limegreen'
+#SOMA_COLOR = 'limegreen'
 STROKE_VERTICAL = 'black'
 
 
@@ -157,14 +157,14 @@ def svg_node_line(dwg, node1, node2, stroke = STROKE_1, stroke_width = STROKE_WI
                      stroke = stroke, stroke_width = stroke_width))
 
 
-def tree_svg(dwg, tree, decorator_file = None, color = STROKE_1, soma_color = SOMA_COLOR):
+def tree_svg(dwg, tree, decorator_file = None, color = STROKE_1):#, soma_color = SOMA_COLOR):
 
     if tree.is_leaf:
         svg_leaf(dwg, tree, decorator_file)
     
     elif len(tree.children) == 1:        
         nextBP = _next_BP(tree)
-        svg_node_line(dwg, tree, nextBP, stroke = color if tree.sd_type != 1 else soma_color)
+        svg_node_line(dwg, tree, nextBP, stroke = color)# if tree.sd_type != 1 else soma_color)
 
         tree_svg(dwg, nextBP, decorator_file, color)
         
@@ -177,7 +177,7 @@ def tree_svg(dwg, tree, decorator_file = None, color = STROKE_1, soma_color = SO
     else: #BP
         dwg.add(dwg.line((tree.xs, tree.children[0].ys),
                          (tree.xs, tree.children[-1].ys),
-                         stroke = STROKE_VERTICAL if tree.sd_type != 1 else soma_color,
+                         stroke = STROKE_VERTICAL,# if tree.sd_type != 1 else soma_color,
                          stroke_width = .5))
         
         for child in tree.children:
@@ -199,12 +199,20 @@ def tree_svg(dwg, tree, decorator_file = None, color = STROKE_1, soma_color = SO
 
 @ele_mani
 def _n_BP(tree):
+    is_root_BP = len(tree.root.children) > 1
+    #if len(tree.root.children) > 1: #root is BP
+    tree.root.n_BP_before = 0
+    for node in tree.root.descendants:
+        node.n_BP_before = node.branch_node_num + 1 if is_root_BP else node.branch_node_num
+        #print node.n_BP_before
+    '''
     if tree.is_root:
         tree.n_BP_before = 0    
     else:
         tree.n_BP_before = tree.parent.n_BP_before if len(tree.siblings) == 0 else tree.parent.n_BP_before + 1
     
     _n_BP(tree.children)
+    '''
 
 
 def _leaf_id_XSCALE(tree):

@@ -10,7 +10,8 @@ from copy import deepcopy
 
 from ele_manipulation import ele_mani
 
-R_RESCALE = 0.0884
+#R_RESCALE = 0.0884
+R_RESCALE = 1.0
 R_STRETCH = 2
 SYM_EXT_N = 2
 SPL_ORDER = 4
@@ -81,14 +82,14 @@ def _generate_der(leaf, extent_n = SYM_EXT_N):
     X, Y = [], [] 
     _leaf_XY(leaf, X, Y)
 
-    X_ext, Y_ext = _sym_extend(X, Y, extent_n)
-    Xnew, Ynew = _LinearInterpolation(X_ext, Y_ext)
+    X_ext, Y_ext = _sym_extend(X, Y, extent_n) if len(X) > 2 else (X, Y) 
+    Xnew, Ynew = _LinearInterpolation(X_ext[2:], Y_ext[2:]) if len(X_ext) > 3 else _LinearInterpolation(X_ext, Y_ext)
     Xnew, Ynew = _LinearInterpolation(Xnew, Ynew)
 
     f = interpolate.UnivariateSpline(Xnew, Ynew, k = SPL_ORDER)      
     
     for index, node in enumerate(leaf.path):
-        der = f.derivative(n = DER_ORDER)(X[index])
+        der = f.derivative(n = DER_ORDER)(X[index]) if index != 0 else 0
         node.der = filter(lambda x: abs(x) <= abs(der), (node.der, der))[0] if node.der else der
 
     return f, X, Y
@@ -108,10 +109,10 @@ def mark_all_ders(tree, extent_n = SYM_EXT_N):
 
 def _Draw(f, x, y):
 
-    xnew = np.arange(min(x), max(x), (max(x)-min(x))/(len(x)*50))
+    xnew = np.arange(min(x[2:]), max(x[2:]), (max(x[2:])-min(x[2:]))/(len(x)*50))
     ynew = map(f, xnew)
     
-    der = map(f.derivative(n = 2), x)
+    der = map(f.derivative(n = 2), x[2:])
     dernew = map(f.derivative(n = 2), xnew)
     
     fig, left_axis = plt.subplots()
@@ -120,7 +121,7 @@ def _Draw(f, x, y):
     p1, = left_axis.plot(xnew, ynew, 'b-')
     p1, = left_axis.plot(x, y, 'bo')  
     p2, = right_axis.plot(xnew, dernew, 'r:')
-    p2, = right_axis.plot(x, der, 'r.')
+    p2, = right_axis.plot(x[2:], der, 'r.')
 
     left_axis.set_xlabel('Distance to root')
     left_axis.set_ylabel('Radius')
