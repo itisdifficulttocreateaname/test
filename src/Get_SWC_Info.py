@@ -10,16 +10,27 @@ from Radius_Change import plot_tree, PLOT_DIR
 from StretchType import stretch_type
 from ele_manipulation import ele_mani
 from cmd import check_file
+from globals import my_global
 
-#X_RESCALE = 0.0884
-#Y_RESCALE = 0.0884
-X_RESCALE = 0.221180865682821
-Y_RESCALE = 0.221180865682821
-X_RESCALE = 0.110590432841411
-Y_RESCALE = 0.110590432841411
-Z_RESCALE = 0.7
-Z_RESCALE = 1.0
-R_RESCALE = 1.0
+my_global = my_global()
+X_RESCALE = my_global.x_rescale
+Y_RESCALE = my_global.y_rescale
+Z_RESCALE = my_global.z_rescale
+R_RESCALE = my_global.r_rescale
+
+
+# X_RESCALE = 0.0884
+# Y_RESCALE = 0.0884
+# Z_RESCALE = 1.0
+# R_RESCALE = 0.0884
+
+# X_RESCALE = 0.221180865682821
+# Y_RESCALE = 0.221180865682821
+# X_RESCALE = 0.110590432841411
+# Y_RESCALE = 0.110590432841411
+# Z_RESCALE = 0.7
+# Z_RESCALE = 1.0
+# R_RESCALE = 1.0
 
 
 class NeuronNode(Node):
@@ -42,6 +53,7 @@ class NeuronNode(Node):
         self.dist_to_leaf = 0
 
         self.der = None
+        self.is_der_loc_min = False
 
     @property
     def all_nodes(self):

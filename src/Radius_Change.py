@@ -9,9 +9,11 @@ import numpy as np
 from copy import deepcopy
 
 from ele_manipulation import ele_mani
+from globals import my_global
 
-#R_RESCALE = 0.0884
-R_RESCALE = 1.0
+my_global = my_global()
+R_RESCALE = my_global.r_rescale 
+#R_RESCALE = 1.0
 R_STRETCH = 2
 SYM_EXT_N = 2
 SPL_ORDER = 4
@@ -31,13 +33,13 @@ def _leaf_XY(leaf, X, Y):
 
 
 def _sym_extend(X, Y, n = SYM_EXT_N):
-    if len(X) >= 3:
+    if len(X) >= SYM_EXT_N+1:
         X_ext, Y_ext = deepcopy(X), deepcopy(Y)
         X_ext = X_ext + map(lambda x: 2*X_ext[-1]-x, X_ext[-2:-2-n:-1])
         Y_ext = Y_ext + Y_ext[-2:-2-n:-1]
         return X_ext, Y_ext
-    elif len(X) == 2:
-        n = 1
+    elif len(X) == SYM_EXT_N:
+        n = SYM_EXT_N-1
         X_ext, Y_ext = deepcopy(X), deepcopy(Y)
         X_ext = X_ext + X_ext[-2:-2-n:-1]
         Y_ext = Y_ext + Y_ext[-2:-2-n:-1]
@@ -112,8 +114,8 @@ def _Draw(f, x, y):
     xnew = np.arange(min(x[2:]), max(x[2:]), (max(x[2:])-min(x[2:]))/(len(x)*50))
     ynew = map(f, xnew)
     
-    der = map(f.derivative(n = 2), x[2:])
-    dernew = map(f.derivative(n = 2), xnew)
+    der = map(f.derivative(n = DER_ORDER), x[2:])
+    dernew = map(f.derivative(n = DER_ORDER), xnew)
     
     fig, left_axis = plt.subplots()
     right_axis = left_axis.twinx()
